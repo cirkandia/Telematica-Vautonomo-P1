@@ -1,0 +1,23 @@
+# .gitignore raíz
+
+# Archivos de logs
+*.log
+
+# Archivos y carpetas de compilación C
+/server-c/build/
+/server-c/*.exe
+
+# Archivos temporales de Python
+__pycache__/
+/client-python/__pycache__/
+/client-python/*.pyc
+
+# Salida de compilación Java
+/client-java/out/
+
+# Archivos de configuración de VSCode (opcional, si no quieres compartirlos)
+.vscode/
+
+# Archivos del sistema
+.DS_Store
+Thumbs.db
