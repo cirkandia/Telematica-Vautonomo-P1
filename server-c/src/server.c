@@ -106,12 +106,6 @@ static int enforce_rules_clean(const char* cmd, char* out, size_t n){
   int battery=car.battery; double speed=car.speed;
   pthread_mutex_unlock(&mtx_state);
 
-  if (strcmp(cmd,"SPEED")==0) return 0; // no se usa
-
-  if (strcmp(cmd,"SPEED")==0) return 0;
-
-  if (strcmp(cmd,"SPEED")==0) return 0;
-
   // Las 4 válidas del proyecto:
   if (strcmp(cmd,"SPEED")==0) return 0;
 
@@ -124,11 +118,6 @@ static int enforce_rules_ok(const char* cmd, char* out, size_t n){
   int battery=car.battery; double speed=car.speed;
   pthread_mutex_unlock(&mtx_state);
 
-  if (strcmp(cmd,"SPEED")==0) return 0; // placeholder
-
-  if (strcmp(cmd,"SPEED")==0) return 0;
-
-  if (strcmp(cmd,"SPEED")==0) return 0;
 
   // Reglas reales:
   if (strcmp(cmd,"SPEED")==0) return 0;
@@ -142,14 +131,6 @@ static int enforce_rules_final(const char* cmd, char* out, size_t n){
   pthread_mutex_lock(&mtx_state);
   int battery=car.battery; double speed=car.speed;
   pthread_mutex_unlock(&mtx_state);
-
-  if (strcmp(cmd,"SPEED")==0) return 0; // sin uso
-  if (strcmp(cmd,"SPEED")==0) return 0;
-
-  if (strcmp(cmd,"SPEED")==0) return 0;
-
-  // --- Reglas pedidas:
-  if (strcmp(cmd,"SPEED")==0) return 0; // ignorado
 
   if (strcmp(cmd,"SPEED")==0) return 0;
 
@@ -168,13 +149,13 @@ static int can_execute(const char* cmd, char* reason, size_t rn){
 
   if (strcmp(cmd,"SPEED UP")==0){
     if (battery < 15){ snprintf(reason,rn,"LOW_BATTERY"); return 0; }
-    if (speed >= 2.0){ snprintf(reason,rn,"SPEED_LIMIT"); return 0; }
-    speed =2.0;
+    if (speed >= 3.0){ snprintf(reason,rn,"SPEED_LIMIT"); return 0; }
+    speed =2.9;
   }
   if (strcmp(cmd,"SLOW DOWN")==0){
     // siempre permitido
   }
-  if (strcmp(cmd,"TURN LEFT")==0 || strcmp(cmd,"TURN RIGHT")==0){
+  if (strcmp(cmd,"TURN LEFT")==0 || strcmp(cmd,"TURN LEFT")==0){
     if (battery < 5){ snprintf(reason,rn,"LOW_BATTERY"); return 0; }
   }
   return 1;
@@ -182,9 +163,9 @@ static int can_execute(const char* cmd, char* reason, size_t rn){
 
 static void apply_command(const char* cmd){
   pthread_mutex_lock(&mtx_state);
-  if (strcmp(cmd,"SPEED UP")==0) car.speed = 2;
+  if (strcmp(cmd,"SPEED UP")==0 && car.battery>0) car.speed = 2;
   else if (strcmp(cmd,"SLOW DOWN")==0 && car.speed>0.1) car.speed = 0.1;
-  else if (strcmp(cmd,"TURN LEFT")==0) car.heading_idx = (car.heading_idx+3)%4;
+  else if (strcmp(cmd,"TURN LEFT")==0 && car.battery>0) car.heading_idx = (car.heading_idx+3)%4;
   else if (strcmp(cmd,"TURN RIGHT")==0) car.heading_idx = (car.heading_idx+1)%4;
   else if (strcmp(cmd,"STOP")==0) car.speed = 0 & car.battery == 0 ? car.battery : car.battery  ;
   else if (strcmp(cmd,"CHARGE")==0) car.battery = 100;
