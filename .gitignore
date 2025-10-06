@@ -16,7 +16,7 @@ __pycache__/
 /client-java/out/
 
 # Archivos de configuración de VSCode (opcional, si no quieres compartirlos)
-.vscode/
+.vscode/launch.json
 
 # Archivos del sistema
 .DS_Store
