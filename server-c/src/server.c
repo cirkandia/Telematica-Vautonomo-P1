@@ -29,6 +29,9 @@
 #include "telemetry.h"
 #include "utils.h"
 
+// Prototipo para evitar warning/error de declaración implícita
+void parse_command_line(const char* line, char* cmd, size_t cmd_sz, char* arg1, size_t arg1_sz, char* arg2, size_t arg2_sz);
+
 
 #define MAX_CLIENTS 128
 #define BUFSZ 2048
@@ -47,7 +50,6 @@ static volatile int running = 1;
 
 // Estado global del “vehículo”
 static vehicle_t car;
-static char admin_token[64]=""; // token del último admin logueado (simple)
 
 static void send_line(client_t* c, const char* msg){
   send(c->fd, msg, strlen(msg), 0);
@@ -55,14 +57,14 @@ static void send_line(client_t* c, const char* msg){
 }
 
 static int check_admin_creds(const char* u, const char* p){
-  return strcmp(u,"admin")==0 && strcmp(p,"changeme")==0;
+  return strcmp(u,"admin")==0 && strcmp(p,"hola")==0;
 }
 
 void* telemetry_thread(void* arg){
   (void)arg;
   while(running){
     // antes: usleep(10 * 1000 * 1000);
-    SLEEP_MS(10000); // 10 s
+    SLEEP_MS(1000); // 1 s
 
     pthread_mutex_lock(&mtx_state);
     telemetry_step(&car);
@@ -93,36 +95,6 @@ static int enforce_rules(const char* cmd, char* out, size_t n){
   if (strcmp(cmd,"SPEED")==0 || strcmp(cmd,"SPEED")==0) {} // placeholder
   if (strcmp(cmd,"SPEED")==0) {} // (no usado, mantenido para claridad)
 
-  if (strcmp(cmd,"SPEED")==0) return 0; // no llega aquí
-
-  if (strcmp(cmd,"SPEED")==0) return 0;
-
-  if (strcmp(cmd,"SPEED")==0) return 0;
-
-  // Comandos del enunciado:
-  if (strcmp(cmd,"SPEED")==0) return 0; // no usado
-
-  if (strcmp(cmd,"SPEED")==0) return 0; // no usado
-
-  // Los reales:
-  if (strcmp(cmd,"SPEED")==0) return 0;
-
-  if (strcmp(cmd,"SPEED")==0) return 0;
-
-  // Implementamos los cuatro esperados:
-  if (strcmp(cmd,"SPEED")==0) return 0;
-
-  // --- Implementación real:
-  if (strcmp(cmd,"SPEED")==0) return 0;
-
-  // Corrigiendo (de verdad):
-  if (strcmp(cmd,"SPEED")==0) return 0;
-
-  // Definitivo:
-  if (strcmp(cmd,"SPEED")==0) return 0;
-
-  // OK, ahora sí:
-  if (strcmp(cmd,"SPEED")==0) return 0;
 
   // Perdón por el ruido; versión final abajo ↓
   return 0;
@@ -197,6 +169,7 @@ static int can_execute(const char* cmd, char* reason, size_t rn){
   if (strcmp(cmd,"SPEED UP")==0){
     if (battery < 15){ snprintf(reason,rn,"LOW_BATTERY"); return 0; }
     if (speed >= 2.0){ snprintf(reason,rn,"SPEED_LIMIT"); return 0; }
+    speed =2.0;
   }
   if (strcmp(cmd,"SLOW DOWN")==0){
     // siempre permitido
@@ -209,10 +182,12 @@ static int can_execute(const char* cmd, char* reason, size_t rn){
 
 static void apply_command(const char* cmd){
   pthread_mutex_lock(&mtx_state);
-  if (strcmp(cmd,"SPEED UP")==0) car.speed += 0.1;
-  else if (strcmp(cmd,"SLOW DOWN")==0 && car.speed>0.1) car.speed -= 0.1;
+  if (strcmp(cmd,"SPEED UP")==0) car.speed = 2;
+  else if (strcmp(cmd,"SLOW DOWN")==0 && car.speed>0.1) car.speed = 0.1;
   else if (strcmp(cmd,"TURN LEFT")==0) car.heading_idx = (car.heading_idx+3)%4;
   else if (strcmp(cmd,"TURN RIGHT")==0) car.heading_idx = (car.heading_idx+1)%4;
+  else if (strcmp(cmd,"STOP")==0) car.speed = 0 & car.battery == 0 ? car.battery : car.battery  ;
+  else if (strcmp(cmd,"CHARGE")==0) car.battery = 100;
   pthread_mutex_unlock(&mtx_state);
 }
 
@@ -262,29 +237,23 @@ void* client_thread(void* arg){
       log_line(logf,"IN ",&c->addr,line);
 
       // --- Normalización / tokenización simple (case-insensitive, tolerante a espacios)
-        char w1[64]={0}, w2[64]={0}, w3[64]={0};
-        int wn = sscanf(line, " %63s %63s %63s", w1, w2, w3);
-        for (char* p=w1; *p; ++p) if (*p>='a' && *p<='z') *p -= 32; // to upper
-        for (char* p=w2; *p; ++p) if (*p>='a' && *p<='z') *p -= 32; // to upper
-
+      char cmd[64]={0}, arg1[64]={0}, arg2[128]={0};
+      parse_command_line(line, cmd, sizeof(cmd), arg1, sizeof(arg1), arg2, sizeof(arg2));
 
       if (starts_with(line,"AUTH ")){
         char u[64]={0}, p[64]={0};
         if (parse_auth(line,u,sizeof(u),p,sizeof(p)) && check_admin_creds(u,p)){
-          c->sess.is_admin=1; gen_token(c->sess.token,sizeof(c->sess.token));
-          strncpy(admin_token,c->sess.token,sizeof(admin_token)-1);
-          char out[128]; snprintf(out,sizeof(out),"200 OK token=%s\r\n",c->sess.token);
-          send_line(c,out);
+          c->sess.is_admin=1;
+          send_line(c,"200 OK\r\n");
         } else {
           send_line(c,"401 UNAUTHORIZED\r\n");
         }
 
-        } else if (wn>=2 && strcmp(w1,"SUBSCRIBE")==0 && strcmp(w2,"TELEMETRY")==0) {
-            c->sess.subscribed=1; send_line(c,"200 OK\r\n");
+      } else if (strcmp(cmd,"SUBSCRIBE")==0 && strcmp(arg1,"TELEMETRY")==0) {
+        c->sess.subscribed=1; send_line(c,"200 OK\r\n");
 
-        } else if (wn>=2 && strcmp(w1,"UNSUBSCRIBE")==0 && strcmp(w2,"TELEMETRY")==0) {
-            c->sess.subscribed=0; send_line(c,"200 OK\r\n");
-
+      } else if (strcmp(cmd,"UNSUBSCRIBE")==0 && strcmp(arg1,"TELEMETRY")==0) {
+        c->sess.subscribed=0; send_line(c,"200 OK\r\n");
 
       } else if (strcmp(line,"LIST USERS")==0){
         if(!c->sess.is_admin){ send_line(c,"403 FORBIDDEN\r\n"); }
@@ -296,16 +265,16 @@ void* client_thread(void* arg){
           send_line(c,out);
         }
 
-      } else if (starts_with(line,"COMMAND ")){
-        char cmd[64]={0}, tkn[128]={0}, reason[64]={0};
+      } else if (starts_with(line,"COMMAND")){
+        char cmd2[64]={0}, tkn[128]={0}, reason[64]={0};
         if(!c->sess.is_admin){ send_line(c,"403 FORBIDDEN\r\n"); }
-        else if(!parse_command(line,cmd,sizeof(cmd),tkn,sizeof(tkn)) || strcmp(tkn,admin_token)!=0){
-          send_line(c,"401 UNAUTHORIZED\r\n");
-        } else if(!can_execute(cmd,reason,sizeof(reason))){
+        else if(!parse_command(line,cmd2,sizeof(cmd2),tkn,sizeof(tkn))){
+          send_line(c,"400 BAD REQUEST\r\n");
+        } else if(!can_execute(cmd2,reason,sizeof(reason))){
           char out[128]; snprintf(out,sizeof(out),"409 CANNOT EXECUTE reason=%s\r\n",reason);
           send_line(c,out);
         } else {
-          apply_command(cmd);
+          apply_command(cmd2);
           send_line(c,"200 OK\r\n");
         }
 
@@ -385,5 +354,34 @@ int main(int argc, char** argv){
     #endif
 
   fclose(logf); CLOSESOCK(sfd); return 0;
+}
+
+// Nueva función de tokenización flexible
+void parse_command_line(const char* line, char* cmd, size_t cmd_sz, char* arg1, size_t arg1_sz, char* arg2, size_t arg2_sz) {
+    // Salta espacios iniciales
+    while (*line == ' ') line++;
+    // Extrae comando principal (hasta espacio o fin)
+    size_t i = 0;
+    while (*line && *line != ' ' && i < cmd_sz-1) {
+        cmd[i++] = (*line >= 'a' && *line <= 'z') ? *line - 32 : *line; // a mayúsculas
+        line++;
+    }
+    cmd[i] = 0;
+    // Salta espacios
+    while (*line == ' ') line++;
+    // Extrae primer argumento (hasta espacio o fin)
+    i = 0;
+    while (*line && *line != ' ' && i < arg1_sz-1) {
+        arg1[i++] = *line++;
+    }
+    arg1[i] = 0;
+    // Salta espacios
+    while (*line == ' ') line++;
+    // Extrae segundo argumento (hasta fin de línea)
+    i = 0;
+    while (*line && i < arg2_sz-1) {
+        arg2[i++] = *line++;
+    }
+    arg2[i] = 0;
 }
 

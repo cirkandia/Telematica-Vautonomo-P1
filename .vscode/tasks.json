@@ -2,52 +2,36 @@
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "Build (mingw64.exe)",
-      "type": "shell",
-      "command": "C:\\msys64\\mingw64.exe",
-      "args": [
-        "-c",
-        "cd \"$(cygpath -u \"${workspaceFolder}\")/server-c\" && make clean && make -j"
-      ],
-      "problemMatcher": "$gcc",
-      "group": { "kind": "build", "isDefault": true },
-      "presentation": { "panel": "dedicated", "clear": true, "reveal": "always" }
-    },
-    {
-      "label": "Run server (mingw64.exe)",
-      "type": "shell",
-      "command": "C:\\msys64\\mingw64.exe",
-      "args": [
-        "-c",
-        "cd \"$(cygpath -u \"${workspaceFolder}\")/server-c\" && ./build/server 5000 server.log"
-      ],
-      "presentation": { "panel": "dedicated", "clear": true, "reveal": "always" }
-    },
-    {
-      "label": "Build + Run server",
-      "dependsOn": ["Build (mingw64.exe)", "Run server (mingw64.exe)"],
-      "dependsOrder": "sequence"
-    },
-    {
-      "label": "Run client-python",
-      "type": "shell",
+      "label": "Run Python Observer",
+      "type": "process",
       "command": "python",
-      "args": ["client-python\\app.py"],
-      "options": { "cwd": "${workspaceFolder}" },
-      "presentation": { "panel": "dedicated", "reveal": "always" }
+      "args": ["main.py", "--host", "127.0.0.1", "--port", "5000", "--mode", "observer"],
+      "options": { "cwd": "${workspaceFolder}/client-python" },
+      "problemMatcher": []
     },
     {
-      "label": "Run client-java",
-      "type": "shell",
-      "command": "javac src\\Main.java -d out && java -cp out Main",
+      "label": "Run Python Admin",
+      "type": "process",
+      "command": "python",
+      "args": ["main.py", "--host", "127.0.0.1", "--port", "5000", "--mode", "admin", "--user", "admin", "--pass", "changeme"],
+      "options": { "cwd": "${workspaceFolder}/client-python" },
+      "problemMatcher": []
+    },
+    {
+      "label": "Run Java Observer",
+      "type": "process",
+      "command": "java",
+      "args": ["-cp", "target/classes", "com.tuapp.Client", "--host", "127.0.0.1", "--port", "5000", "--mode", "observer"],
       "options": { "cwd": "${workspaceFolder}/client-java" },
-      "presentation": { "panel": "dedicated", "reveal": "always" }
+      "problemMatcher": []
     },
     {
-      "label": "Kill server.exe (Windows)",
-      "type": "shell",
-      "command": "taskkill /IM server.exe /F",
-      "options": { "cwd": "${workspaceFolder}/server-c" }
+      "label": "Run Java Admin",
+      "type": "process",
+      "command": "java",
+      "args": ["-cp", "target/classes", "com.tuapp.Client", "--host", "127.0.0.1", "--port", "5000", "--mode", "admin", "--user", "admin", "--pass", "changeme"],
+      "options": { "cwd": "${workspaceFolder}/client-java" },
+      "problemMatcher": []
     }
   ]
 }

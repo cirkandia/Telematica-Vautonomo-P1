@@ -1,4 +1,5 @@
 import socket, threading, tkinter as tk
+from tkinter import font
 
 HOST='127.0.0.1'; PORT=5000
 
@@ -7,12 +8,15 @@ class App:
         self.root = root
         root.title("Telemetría - Python")
         self.speed=tk.StringVar(value="0.00"); self.bat=tk.StringVar(value="0")
+        root.geometry("400x300")
+        self.label_font = font.Font(family="Arial", size=14)
+        self.value_font = font.Font(family="Arial", size=18, weight="bold")
         self.temp=tk.StringVar(value="0.0");  self.head=tk.StringVar(value="-")
 
         for i,(k,v) in enumerate([("Velocidad",self.speed),("Batería",self.bat),
                                   ("Temp",self.temp),("Dirección",self.head)]):
-            tk.Label(root,text=k+":").grid(row=i,column=0,sticky="e")
-            tk.Label(root,textvariable=v).grid(row=i,column=1,sticky="w")
+            tk.Label(root,text=k+":", font=self.label_font).grid(row=i,column=0,sticky="e", padx=5, pady=5)
+            tk.Label(root,textvariable=v, font=self.value_font).grid(row=i,column=1,sticky="w",padx=5,pady=5)
 
         self.sock = socket.create_connection((HOST,PORT))
         self.sock.sendall(b"SUBSCRIBE TELEMETRY\r\n")
