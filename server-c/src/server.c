@@ -64,7 +64,7 @@ void* telemetry_thread(void* arg){
   (void)arg;
   while(running){
     // antes: usleep(10 * 1000 * 1000);
-    SLEEP_MS(1000); // 1 s
+    SLEEP_MS(10000); // 1 s
 
     pthread_mutex_lock(&mtx_state);
     telemetry_step(&car);
