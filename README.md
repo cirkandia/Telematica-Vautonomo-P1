@@ -144,7 +144,7 @@ java -cp client-java Client --host 127.0.0.1 --port 5000 --mode admin --user adm
 * Eventos: `TELEMETRY speed=<f> battery=<int> heading=<N|E|S|W> ts=<ms> [x=<f> y=<f>]`.
 * Códigos: `200 OK`, `400 BAD REQUEST`, `401 UNAUTHORIZED`, `403 FORBIDDEN`, `409 CANNOT EXECUTE reason=...`.
 
-El documento completo está en **`docs/RFC-lite-VEHI.md`**.
+El documento completo está [Aquí](./docs/RFC.md)
 
 ---
 
@@ -170,7 +170,3 @@ Tareas para lanzar clientes sin compilar server:
 * "undefined reference to WSA.../pthread..." al compilar: enlaza `-lws2_32 -lpthread` (Makefile ya lo incluye).
 
 ---
-
-## Contribuir
-
-PRs y issues bienvenidos. Estilo: C11, warnings a cero idealmente, mensajes CRLF.
