@@ -144,7 +144,7 @@ java -cp client-java Client --host 127.0.0.1 --port 5000 --mode admin --user adm
 * Eventos: `TELEMETRY speed=<f> battery=<int> heading=<N|E|S|W> ts=<ms> [x=<f> y=<f>]`.
 * Códigos: `200 OK`, `400 BAD REQUEST`, `401 UNAUTHORIZED`, `403 FORBIDDEN`, `409 CANNOT EXECUTE reason=...`.
 
-El documento completo está [Aquí](./docs/RFC.md)
+El documento completo está [Aquí](./docs/RFC)
 
 ---
 
