@@ -1,0 +1,297 @@
+# RFC VEHI/1.0 – Protocolo de Telemetría y Control para Vehículo Autónomo
+
+> **Estatus:** Informativo (RFC‑lite para curso de Telemática)
+> **Versión de protocolo:** VEHI/1.0
+> **Transporte:** TCP obligatorio para control/autenticación; UDP opcional para telemetría (ver §10)
+> **Codificación:** UTF‑8, mensajes de texto con terminación CRLF (\r\n)
+
+---
+
+## 0. Repositorio y build
+
+**Repositorio:** [https://github.com/cirkandia/Telematica-Vautonomo-P1](https://github.com/cirkandia/Telematica-Vautonomo-P1)
+**Estructura principal:**
+
+* `server-c/` (Servidor en C)
+* `client-python/` (Cliente Python)
+* `client-java/src/` (Cliente Java)
+* `docs/`, `.vscode/`, `README.md`
+
+**Compilación (MSYS2 MinGW 32‑bit):**
+
+```bash
+mingw32-make clean
+mingw32-make
+```
+
+El binario queda en `build/server.exe`.
+
+**Ejecución del servidor:**
+
+```bash
+cd build
+./server.exe <PUERTO> <logfile>
+# ej.: ./server.exe 5000 server.log
+```
+
+## 1. Introducción
+
+VEHI/1.0 define un protocolo de aplicación ligero para controlar un vehículo simulado y recibir su telemetría. Un **Servidor** central acepta múltiples **Clientes** concurrentes. Existen dos roles:
+
+* **Administrador (Admin):** autenticado, puede enviar comandos de control.
+* **Observador (Observer):** no autenticado, puede suscribirse a telemetría.
+
+El objetivo es proveer mensajes legibles, fáciles de depurar (tipo línea de comandos), y suficientemente estrictos para implementaciones interoperables.
+
+## 2. Términos y convenciones
+
+* "**DEBE**" (MUST), "**DEBERÍA**" (SHOULD) y "**PUEDE**" (MAY) siguen [RFC 2119] (uso informativo).
+* *CRLF* es la secuencia `\r\n`.
+* *token* es un identificador opaco (ASCII alfanumérico + `-_.`) emitido por el servidor tras `AUTH`.
+
+## 3. Modelo y arquitectura
+
+* **Topología:** 1 Servidor (escucha en TCP/PUERTO) y N Clientes.
+* **Sesión:** cada conexión TCP mantiene un contexto: rol, suscripción y, si aplica, `token`.
+* **Difusión:** el Servidor envía **TELEMETRY** a toda sesión **suscrita** cada 10 s (configurable).
+
+## 4. Visión general del flujo
+
+1. Cliente conecta (TCP).
+2. (Opcional) `SUBSCRIBE TELEMETRY` → el Servidor comienza a enviar eventos periódicos.
+3. (Opcional, solo Admin) `AUTH username=… password=…` → `200 OK token=…`
+4. (Admin) `COMMAND <ACCION> token=<token>` → `200 OK` o error `4xx`.
+
+## 5. Formato de mensaje
+
+* Mensajes **texto plano**, una orden por línea, **terminada en CRLF**.
+* **Clave=valor** sin espacios en la clave; valores sin CRLF; espacios simples permitidos entre pares.
+* El Servidor **DEBE** responder con una línea por solicitud, salvo `SUBSCRIBE TELEMETRY` que habilita flujo asíncrono.
+
+### 5.1 Gramática (ABNF simplificado)
+
+```
+message      = request / response / event CRLF
+request      = (auth / subscribe / unsubscribe / command / ping / list)
+response     = status [SP detail]
+status       = status2xx / status4xx
+status2xx    = "200" SP "OK" *(SP kvpair)
+status4xx    = ("400" / "401" / "403" / "409") SP reason *(SP kvpair)
+reason       = 1*(%x21 / %x23-7E)                 ; visible, sin espacios iniciales
+
+event        = telemetry
+telemetry    = "TELEMETRY" SP kvpair *(SP kvpair)
+
+kvpair       = key "=" value
+key          = 1*(ALPHA / DIGIT / "_" / "-" )
+value        = 1*(VCHAR / SP)                     ; sin CRLF
+
+auth         = "AUTH" SP "username=" value SP "password=" value
+subscribe    = "SUBSCRIBE" SP "TELEMETRY"
+unsubscribe  = "UNSUBSCRIBE" SP "TELEMETRY"
+command      = "COMMAND" SP action SP "token=" value
+ping         = "PING"
+list         = "LIST" SP "USERS"                  ; solo Admin
+
+action       = "SPEED" SP "UP"
+             / "SLOW" SP "DOWN"
+             / "TURN" SP "LEFT"
+             / "TURN" SP "RIGHT"
+```
+
+### 5.2 Límites recomendados
+
+* Línea ≤ 1024 bytes.
+* `token` ≤ 64 bytes.
+* Rechazar entradas que excedan límites con `400 BAD REQUEST`.
+
+## 6. Semántica de comandos
+
+### 6.1 Autenticación
+
+```
+C > AUTH username=admin password=changeme\r\n
+S < 200 OK token=abC123-xyz\r\n
+```
+
+* Fallo de credenciales: `401 UNAUTHORIZED`.
+
+### 6.2 Suscripción a telemetría
+
+```
+C > SUBSCRIBE TELEMETRY\r\n
+S < 200 OK\r\n
+S < TELEMETRY speed=12.5 battery=88 heading=N ts=1730152800123\r\n
+```
+
+* `UNSUBSCRIBE TELEMETRY` detiene el flujo.
+
+### 6.3 Comandos de control (solo Admin)
+
+```
+C > COMMAND SPEED UP token=abC123-xyz\r\n
+S < 200 OK\r\n
+```
+
+Errores posibles:
+
+* `401 UNAUTHORIZED` (sin `AUTH`/token inválido).
+* `403 FORBIDDEN` (rol no autorizado).
+* `409 CANNOT EXECUTE reason=<texto>` (reglas del vehículo: p. ej., batería baja, límite de velocidad, etc.).
+
+### 6.4 Keep‑alive
+
+```
+C > PING\r\n
+S < 200 OK\r\n      ; servidor PUEDE responder "PONG" o "200 OK"
+```
+
+### 6.5 Lista de usuarios conectados (solo Admin)
+
+```
+C > LIST USERS\r\n
+S < 200 OK users=3\r\n
+```
+
+## 7. Eventos de telemetría
+
+Formato recomendado (orden no estricto):
+
+```
+TELEMETRY speed=<float> battery=<int%> heading=<N|E|S|W> temp=<floatC> ts=<epoch_ms> [x=<float> y=<float>]
+```
+
+* `speed` en m/s (o km/h si se documenta explícitamente).
+* `battery` 0..100.
+* `heading` ∈ {N,E,S,W}.
+* `ts` milisegundos UNIX.
+* Campos adicionales **DEBEN** ser ignorados por clientes desconocedores (forward‑compatibilidad).
+
+## 8. Códigos de estado y errores
+
+* **200 OK**: éxito general, puede incluir pares `clave=valor` (p. ej., `token=`).
+* **400 BAD REQUEST**: sintaxis inválida o campo faltante.
+* **401 UNAUTHORIZED**: credenciales faltantes/erróneas o token inválido/expirado.
+* **403 FORBIDDEN**: rol sin permisos para la acción.
+* **409 CANNOT EXECUTE reason=…**: comando válido pero no ejecutable en el estado actual.
+
+## 9. Máquina de estados (resumen)
+
+```
+  +---------+     AUTH OK       +-----------+
+  | CONNECT |------------------>|  ADMIN    |
+  +----+----+                    +-----+-----+
+       |  SUBSCRIBE TELEMETRY          |
+       v                               | COMMAND
+  +----+----+                          v
+  |OBSERVER| <--------------------> [VEHICLE]
+  +---------+       TELEMETRY            
+```
+
+* Cualquier sesión puede entrar/salir de **Observer** con SUB/UNSUB.
+* Solo **Admin** puede emitir **COMMAND**.
+
+## 10. Transporte
+
+* **TCP (DEBE)** usarse para `AUTH`, `COMMAND`, `LIST`, `PING` y control en general (fiabilidad, orden).
+* **Telemetría:**
+
+  * **Opción A (recomendada por simplicidad):** TCP.
+  * **Opción B (opcional):** UDP unidireccional `SERVER→CLIENT` para `TELEMETRY` con `sequence` y `lost_ok=true`.
+
+    * En ese caso, el Cliente **DEBE** anunciar su puerto UDP: `SUBSCRIBE TELEMETRY transport=udp port=<p>` y el Servidor **DEBERÍA** enviar `TELEMETRY` con `seq=<n>`.
+
+## 11. Consideraciones de seguridad
+
+* **Token** asociado a la conexión; el Servidor **DEBE** invalidarlo al cerrar la sesión o por inactividad.
+* **Rate‑limit** sugerido: ≥50 ms entre comandos por cliente; exceso → `409 reason=rate-limit`.
+* **Sanitizar** entradas (longitud, caracteres).
+* En LAN académica suele omitirse TLS; si hay red no confiable, encapsular en túnel seguro (SSH/VPN) o usar TLS en capa de transporte.
+
+## 12. Temporización y reintentos
+
+* **Timeout de lectura** recomendado: 30 s para controlar sesiones inactivas.
+* Si el Servidor no recibe nada por `idle_timeout`, **DEBE** cerrar la conexión limpiamente.
+* Retransmisiones las gestiona TCP; para UDP, el Cliente **NO DEBE** exigir fiabilidad.
+
+## 13. Registro (logging)
+
+* El Servidor **DEBE** registrar: timestamp, remoto `ip:puerto`, tipo de evento, resultado/código, razón en errores.
+* Se recomienda **rotación** de logs y formato legible para `Select-String`/`grep`.
+
+## 14. Interoperabilidad y versionado
+
+* Encabezado (opcional) de saludo del Servidor: `200 OK VEHI/1.0 READY` en la apertura de la conexión.
+* Clientes **DEBEN** ignorar pares desconocidos y **NO** depender del orden de campos.
+* Campos nuevos **PUEDEN** añadirse si no rompen el parseo.
+
+## 15. Ejemplos de sesión
+
+### 15.1 Observer
+
+```
+C> SUBSCRIBE TELEMETRY\r\n
+S> 200 OK\r\n
+S> TELEMETRY speed=9.7 battery=91 heading=E ts=1730152800123\r\n
+```
+
+### 15.2 Admin + comando inválido
+
+```
+C> AUTH username=admin password=changeme\r\n
+S> 200 OK token=K9z-1abC\r\n
+
+C> COMMAND SPEED UP token=K9z-1abC\r\n
+S> 409 CANNOT EXECUTE reason=battery-low\r\n
+```
+
+## 16. Clientes de referencia (en este repo)
+
+**Rutas:** `client-python/` y `client-java/src/`.
+
+**Objetivo común:** Mostrar **velocidad**, **batería** y **dirección** tras `SUBSCRIBE TELEMETRY`; en modo Admin, realizar `AUTH` y enviar `COMMAND` (SPEED UP, SLOW DOWN, TURN LEFT, TURN RIGHT) con `token`.
+
+**Ejecución rápida (observer):**
+
+* Python: `python client-python/main.py --host 127.0.0.1 --port 5000 --subscribe`
+* Java: `javac client-java/src/Client.java && java -cp client-java/src Client --host 127.0.0.1 --port 5000 --mode observer --subscribe true`
+
+**Notas:**
+
+* Los clientes envían y esperan líneas terminadas en **CRLF**.
+* Deben ignorar pares `clave=valor` desconocidos en `TELEMETRY`.
+
+## 17. Consideraciones de implementación (servidor) Consideraciones de implementación (servidor)
+
+* Procesamiento **linea‑por‑línea** sobre TCP con `\r\n`.
+* Broadcast a suscriptores cada 10 s; no bloquear el hilo aceptador.
+* Validar `token` y rol antes de `COMMAND`.
+
+## 18. IANA
+
+No se requiere registro. El puerto es configurable; 5000 se usa a modo de ejemplo.
+
+---
+
+**Anexo A – Tabla de códigos**
+
+| Código | Texto          | Uso                                   |
+| -----: | -------------- | ------------------------------------- |
+|    200 | OK             | Éxito general / respuesta a PING/AUTH |
+|    400 | BAD REQUEST    | Sintaxis inválida/campo faltante      |
+|    401 | UNAUTHORIZED   | Credenciales/token inválido           |
+|    403 | FORBIDDEN      | Rol sin permisos                      |
+|    409 | CANNOT EXECUTE | Estado del vehículo impide la acción  |
+
+**Anexo B – Campos típicos de TELEMETRY**
+
+| Campo   | Tipo  | Rango/Notas                  |
+| ------- | ----- | ---------------------------- |
+| speed   | float | m/s (o km/h si se documenta) |
+| battery | int   | 0..100                       |
+| heading | enum  | N, E, S, W                   |
+| temp    | float | °C                           |
+| ts      | int64 | milisegundos UNIX            |
+| x, y    | float | opcional (posición en plano) |
+
+— Fin del RFC‑lite —
