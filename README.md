@@ -32,7 +32,7 @@ docs/               # Documentación (RFC‑lite, diagramas)
 
 ```bash
 # Abrir "MSYS2 MinGW 32-bit"
-cd /c/ruta/al/repo
+cd /c/ruta/al/repo/serve-c
 mingw32-make clean
 mingw32-make
 ```
@@ -46,7 +46,7 @@ build/server.exe
 ## Ejecutar el servidor
 
 ```bash
-cd /c/ruta/al/repo/build
+cd /c/ruta/al/repo/server-c/build
 ./server.exe 5000 server.log
 ```
 
@@ -56,7 +56,7 @@ cd /c/ruta/al/repo/build
 ### Ver el log desde PowerShell
 
 ```powershell
-Get-Content C:\ruta\al\repo\build\server.log -Tail 50 -Wait
+Get-Content C:\ruta\al\repo\server-c\build\server.log -Tail 50 -Wait
 ```
 
 ---
@@ -109,7 +109,7 @@ En el REPL puedes enviar:
 PING
 SUBSCRIBE TELEMETRY
 AUTH username=admin password=changeme
-COMMAND TURN LEFT token=TU_TOKEN
+COMMAND TURNL
 ```
 
 ---
