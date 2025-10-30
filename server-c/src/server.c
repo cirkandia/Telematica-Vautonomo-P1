@@ -155,7 +155,7 @@ static int can_execute(const char* cmd, char* reason, size_t rn){
   if (strcmp(cmd,"SLOW DOWN")==0){
     // siempre permitido
   }
-  if (strcmp(cmd,"TURN LEFT")==0 || strcmp(cmd,"TURN LEFT")==0){
+  if (strcmp(cmd,"TURNL")==0 || strcmp(cmd,"TURNR")==0){
     if (battery < 5){ snprintf(reason,rn,"LOW_BATTERY"); return 0; }
   }
   return 1;
@@ -165,8 +165,8 @@ static void apply_command(const char* cmd){
   pthread_mutex_lock(&mtx_state);
   if (strcmp(cmd,"SPEED UP")==0 && car.battery>0) car.speed = 2;
   else if (strcmp(cmd,"SLOW DOWN")==0 && car.speed>0.1) car.speed = 0.1;
-  else if (strcmp(cmd,"TURN LEFT")==0 && car.battery>0) car.heading_idx = (car.heading_idx+3)%4;
-  else if (strcmp(cmd,"TURN RIGHT")==0) car.heading_idx = (car.heading_idx+1)%4;
+  else if (strcmp(cmd,"TURNL")==0 && car.battery>0) car.heading_idx = (car.heading_idx+3)%4;
+  else if (strcmp(cmd,"TURNR")==0) car.heading_idx = (car.heading_idx+1)%4;
   else if (strcmp(cmd,"STOP")==0) car.speed = 0 & car.battery == 0 ? car.battery : car.battery  ;
   else if (strcmp(cmd,"CHARGE")==0) car.battery = 100;
   pthread_mutex_unlock(&mtx_state);
