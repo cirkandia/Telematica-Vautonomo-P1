@@ -95,8 +95,8 @@ list         = "LIST" SP "USERS"                  ; solo Admin
 
 action       = "SPEED" SP "UP"
              / "SLOW" SP "DOWN"
-             / "TURN" SP "LEFT"
-             / "TURN" SP "RIGHT"
+             / "TURNL"
+             / "TURNR"
 ```
 
 ### 5.2 Límites recomendados
@@ -110,7 +110,7 @@ action       = "SPEED" SP "UP"
 ### 6.1 Autenticación
 
 ```
-C > AUTH username=admin password=changeme\r\n
+C > AUTH username=admin password=hola\r\n
 S < 200 OK token=abC123-xyz\r\n
 ```
 
